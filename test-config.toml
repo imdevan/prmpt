@@ -1,0 +1,27 @@
+# Prompter CLI Configuration
+
+# Location of the prompts directory containing pre/ and post/ template folders
+prompts_location = "./my-custom-prompts"
+
+# Default editor for opening prompts (when --editor flag is used)
+editor = "nvim"
+
+# Default pre and post templates (optional)
+default_pre = ""
+default_post = ""
+
+# Fix mode settings
+fix_file = "/tmp/prompter-fix.txt"
+
+# Content size limits
+max_file_size_bytes = 65536   # 64KB per file
+max_total_bytes = 262144      # 256KB total content
+
+# Allow content that exceeds size limits
+allow_oversize = false
+
+# Directory traversal strategy: "git" or "filesystem"
+directory_strategy = "git"
+
+# Default output target: "clipboard", "stdout", or "file:/path"
+target = "clipboard"
