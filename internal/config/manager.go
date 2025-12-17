@@ -33,6 +33,13 @@ func NewManager() *Manager {
 	}
 }
 
+// SetConfigPath sets the configuration file path
+func (m *Manager) SetConfigPath(path string) {
+	if path != "" {
+		m.v.SetConfigFile(expandPath(path))
+	}
+}
+
 // setDefaults sets the default configuration values
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("prompts_location", "~/.config/prompter")
@@ -57,6 +64,8 @@ func (m *Manager) Load(path string) (*interfaces.Config, error) {
 		}
 		path = filepath.Join(homeDir, ".config", "prompter", "config.toml")
 	}
+	
+
 	
 	// Expand tilde in path
 	if strings.HasPrefix(path, "~/") {
