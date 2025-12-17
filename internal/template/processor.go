@@ -23,6 +23,11 @@ func NewProcessor(promptsLocation string) *Processor {
 	}
 }
 
+// SetPromptsLocation updates the prompts location
+func (p *Processor) SetPromptsLocation(location string) {
+	p.promptsLocation = location
+}
+
 // LoadTemplate loads a template from the specified path or discovers it by name
 func (p *Processor) LoadTemplate(nameOrPath string) (*template.Template, error) {
 	// If it's an absolute path or contains path separators, load directly
