@@ -55,6 +55,19 @@ func TestBuildRequestFromFlags(t *testing.T) {
 				Files:       []string{},
 			},
 		},
+		{
+			name: "number selection mode",
+			args: []string{"test prompt"},
+			boolFlags: map[string]bool{
+				"numbers": true,
+			},
+			expected: &models.PromptRequest{
+				BasePrompt:   "test prompt",
+				Interactive:  true,
+				NumberSelect: true,
+				Files:        []string{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -72,6 +85,7 @@ func TestBuildRequestFromFlags(t *testing.T) {
 			cmd.Flags().String("editor", "", "")
 			cmd.Flags().Bool("fix", false, "")
 			cmd.Flags().String("fix-file", "", "")
+			cmd.Flags().BoolP("numbers", "n", false, "")
 			
 			// Set flag values
 			for flag, value := range tt.flags {
@@ -115,6 +129,10 @@ func TestBuildRequestFromFlags(t *testing.T) {
 			
 			if result.FixMode != tt.expected.FixMode {
 				t.Errorf("FixMode = %v, expected %v", result.FixMode, tt.expected.FixMode)
+			}
+			
+			if result.NumberSelect != tt.expected.NumberSelect {
+				t.Errorf("NumberSelect = %v, expected %v", result.NumberSelect, tt.expected.NumberSelect)
 			}
 		})
 	}

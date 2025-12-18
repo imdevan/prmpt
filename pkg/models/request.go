@@ -14,6 +14,7 @@ type PromptRequest struct {
 	EditorRequested bool     `json:"editor_requested"` // Track if --editor flag was explicitly used
 	Interactive     bool     `json:"interactive"`
 	ConfigPath      string   `json:"config_path"`
+	NumberSelect    bool     `json:"number_select"`    // Enable number key selection for templates
 }
 
 // NewPromptRequest creates a new PromptRequest with default values

@@ -259,6 +259,29 @@ func TestBuildOptionsWithNone(t *testing.T) {
 	}
 }
 
+func TestSelectTemplate(t *testing.T) {
+	prompter := NewPrompter("/test/prompts")
+	
+	options := []string{"strict", "None", "regular"}
+	
+	// Test regular selection mode (we can't easily test interactive input, so just verify the function exists)
+	// This is more of a compilation test
+	_, err := prompter.selectTemplate(options, "Test message", "Test help", false)
+	// We expect an error since there's no actual input, but the function should exist
+	if err == nil {
+		t.Log("selectTemplate function exists and can be called")
+	}
+	
+	// Test with empty options
+	result, err := prompter.selectTemplate([]string{}, "Test message", "Test help", false)
+	if err != nil {
+		t.Errorf("Expected no error with empty options, got: %v", err)
+	}
+	if result != "None" {
+		t.Errorf("Expected 'None' with empty options, got: %s", result)
+	}
+}
+
 func TestTruncateString(t *testing.T) {
 	tests := []struct {
 		input    string

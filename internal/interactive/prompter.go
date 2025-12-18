@@ -1,12 +1,16 @@
 package interactive
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/AlecAivazis/survey/v2"
+	"golang.org/x/term"
 	"prompter-cli/pkg/models"
 )
 
@@ -90,14 +94,8 @@ func (p *Prompter) promptForPreTemplate(request *models.PromptRequest) error {
 	// Build options with proper ordering: defaults first, then "None", then regulars
 	options := p.buildOptionsWithNone(templates, "pre")
 
-	prompt := &survey.Select{
-		Message: "Select a pre-template (prepended to prompt):",
-		Options: options,
-		Help:    "Pre-templates are added before your base prompt",
-	}
-
-	var selected string
-	if err := survey.AskOne(prompt, &selected); err != nil {
+	selected, err := p.selectTemplate(options, "Select a pre-template (prepended to prompt):", "Pre-templates are added before your base prompt", request.NumberSelect)
+	if err != nil {
 		return err
 	}
 
@@ -118,14 +116,8 @@ func (p *Prompter) promptForPostTemplate(request *models.PromptRequest) error {
 	// Build options with proper ordering: defaults first, then "None", then regulars
 	options := p.buildOptionsWithNone(templates, "post")
 
-	prompt := &survey.Select{
-		Message: "Select a post-template (appended to prompt):",
-		Options: options,
-		Help:    "Post-templates are added after your base prompt",
-	}
-
-	var selected string
-	if err := survey.AskOne(prompt, &selected); err != nil {
+	selected, err := p.selectTemplate(options, "Select a post-template (appended to prompt):", "Post-templates are added after your base prompt", request.NumberSelect)
+	if err != nil {
 		return err
 	}
 
@@ -138,14 +130,13 @@ func (p *Prompter) promptForPostTemplate(request *models.PromptRequest) error {
 
 // promptForDirectoryInclusion asks whether to include directory context
 func (p *Prompter) promptForDirectoryInclusion(request *models.PromptRequest) error {
-	prompt := &survey.Confirm{
-		Message: "Include current directory context in the prompt?",
-		Help:    "This will include relevant files from the current directory",
-		Default: false,
-	}
-
-	var includeDirectory bool
-	if err := survey.AskOne(prompt, &includeDirectory); err != nil {
+	includeDirectory, err := p.selectYesNo(
+		"Include current directory context in the prompt?",
+		"This will include relevant files from the current directory",
+		false, // default to No
+		request.NumberSelect,
+	)
+	if err != nil {
 		return err
 	}
 
@@ -269,6 +260,252 @@ func (p *Prompter) buildOptionsWithNone(templates []string, subdir string) []str
 	options = append(options, regularTemplates...)
 	
 	return options
+}
+
+// selectTemplate handles template selection with optional number key support
+func (p *Prompter) selectTemplate(options []string, message, help string, numberSelect bool) (string, error) {
+	if len(options) == 0 {
+		return "None", nil
+	}
+
+	if numberSelect {
+		return p.selectTemplateWithNumbers(options, message, help)
+	}
+
+	// Use regular survey selection
+	prompt := &survey.Select{
+		Message: message,
+		Options: options,
+		Help:    help,
+	}
+
+	var selected string
+	if err := survey.AskOne(prompt, &selected); err != nil {
+		return "", err
+	}
+
+	return selected, nil
+}
+
+// selectTemplateWithNumbers displays numbered options and allows instant selection by number key
+func (p *Prompter) selectTemplateWithNumbers(options []string, message, help string) (string, error) {
+	fmt.Printf("\n%s\n", message)
+	if help != "" {
+		fmt.Printf("  %s (Press number key for instant selection or use arrow keys)\n", help)
+	}
+	fmt.Println()
+
+	// Display numbered options
+	for i, option := range options {
+		fmt.Printf("  %d. %s\n", i+1, option)
+	}
+	fmt.Println()
+
+	// Check if we're in a terminal that supports raw mode
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		// Fallback to regular input if not in a terminal
+		return p.fallbackNumberSelection(options)
+	}
+
+	// Save the current terminal state
+	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	if err != nil {
+		// Fallback to regular input if raw mode fails
+		return p.fallbackNumberSelection(options)
+	}
+	defer term.Restore(int(syscall.Stdin), oldState)
+
+	fmt.Print("Select option: ")
+
+	// Read single character input
+	buffer := make([]byte, 1)
+	for {
+		_, err := os.Stdin.Read(buffer)
+		if err != nil {
+			return "", err
+		}
+
+		char := buffer[0]
+
+		// Handle number keys (1-9)
+		if char >= '1' && char <= '9' {
+			selectedIndex := int(char - '1') // Convert '1' to 0, '2' to 1, etc.
+			if selectedIndex < len(options) {
+				fmt.Printf("%c\n", char) // Echo the pressed key
+				return options[selectedIndex], nil
+			}
+		}
+
+		// Handle Enter key (fallback to first option or None)
+		if char == '\r' || char == '\n' {
+			fmt.Println()
+			if len(options) > 0 {
+				return options[0], nil
+			}
+			return "None", nil
+		}
+
+		// Handle Escape or Ctrl+C
+		if char == 27 || char == 3 {
+			fmt.Println()
+			return "", fmt.Errorf("selection cancelled")
+		}
+
+		// For any other key, continue waiting
+	}
+}
+
+// fallbackNumberSelection provides a fallback when raw terminal mode is not available
+func (p *Prompter) fallbackNumberSelection(options []string) (string, error) {
+	fmt.Printf("Enter number (1-%d) or press Enter for first option: ", len(options))
+	
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		if len(options) > 0 {
+			return options[0], nil
+		}
+		return "None", nil
+	}
+
+	// Try to parse as number
+	selectedIndex, err := strconv.Atoi(input)
+	if err != nil {
+		return "", fmt.Errorf("invalid input: please enter a number between 1 and %d", len(options))
+	}
+
+	// Validate range (convert from 1-based to 0-based)
+	if selectedIndex < 1 || selectedIndex > len(options) {
+		return "", fmt.Errorf("invalid selection: please enter a number between 1 and %d", len(options))
+	}
+
+	return options[selectedIndex-1], nil
+}
+
+// selectYesNo handles yes/no selection with optional number key support
+func (p *Prompter) selectYesNo(message, help string, defaultValue, numberSelect bool) (bool, error) {
+	if numberSelect {
+		return p.selectYesNoWithNumbers(message, help, defaultValue)
+	}
+
+	// Use regular survey confirm
+	prompt := &survey.Confirm{
+		Message: message,
+		Help:    help,
+		Default: defaultValue,
+	}
+
+	var result bool
+	if err := survey.AskOne(prompt, &result); err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+// selectYesNoWithNumbers displays numbered yes/no options and allows instant selection
+func (p *Prompter) selectYesNoWithNumbers(message, help string, defaultValue bool) (bool, error) {
+	fmt.Printf("\n%s\n", message)
+	if help != "" {
+		fmt.Printf("  %s (Press number key for instant selection)\n", help)
+	}
+	fmt.Println()
+
+	// Display options with default marked
+	if defaultValue {
+		fmt.Println("  1. Yes (default)")
+		fmt.Println("  2. No")
+	} else {
+		fmt.Println("  1. Yes")
+		fmt.Println("  2. No (default)")
+	}
+	fmt.Println()
+
+	// Check if we're in a terminal that supports raw mode
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		// Fallback to regular input if not in a terminal
+		return p.fallbackYesNoSelection(defaultValue)
+	}
+
+	// Save the current terminal state
+	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	if err != nil {
+		// Fallback to regular input if raw mode fails
+		return p.fallbackYesNoSelection(defaultValue)
+	}
+	defer term.Restore(int(syscall.Stdin), oldState)
+
+	fmt.Print("Select option: ")
+
+	// Read single character input
+	buffer := make([]byte, 1)
+	for {
+		_, err := os.Stdin.Read(buffer)
+		if err != nil {
+			return false, err
+		}
+
+		char := buffer[0]
+
+		// Handle number keys
+		if char == '1' {
+			fmt.Printf("1\n")
+			return true, nil // Yes
+		}
+		if char == '2' {
+			fmt.Printf("2\n")
+			return false, nil // No
+		}
+
+		// Handle Enter key (use default)
+		if char == '\r' || char == '\n' {
+			fmt.Println()
+			return defaultValue, nil
+		}
+
+		// Handle Escape or Ctrl+C
+		if char == 27 || char == 3 {
+			fmt.Println()
+			return false, fmt.Errorf("selection cancelled")
+		}
+
+		// For any other key, continue waiting
+	}
+}
+
+// fallbackYesNoSelection provides a fallback when raw terminal mode is not available
+func (p *Prompter) fallbackYesNoSelection(defaultValue bool) (bool, error) {
+	defaultText := "No"
+	if defaultValue {
+		defaultText = "Yes"
+	}
+	
+	fmt.Printf("Enter 1 for Yes, 2 for No, or press Enter for default (%s): ", defaultText)
+	
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultValue, nil
+	}
+
+	switch input {
+	case "1":
+		return true, nil
+	case "2":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid input: please enter 1 for Yes or 2 for No")
+	}
 }
 
 // truncateString truncates a string to the specified length with ellipsis

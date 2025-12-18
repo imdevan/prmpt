@@ -73,6 +73,7 @@ func init() {
 	rootCmd.Flags().String("editor", "", "editor to open prompt in")
 	rootCmd.Flags().Bool("fix", false, "fix mode - process captured command output")
 	rootCmd.Flags().String("fix-file", "", "file containing command output to fix (overrides config)")
+	rootCmd.Flags().BoolP("numbers", "n", false, "enable number key selection for templates")
 }
 
 // buildRequestFromFlags constructs a PromptRequest from command flags and arguments
@@ -142,6 +143,10 @@ func buildRequestFromFlags(cmd *cobra.Command, args []string) (*models.PromptReq
 		return nil, fmt.Errorf("invalid fix-file flag: %w", err)
 	} else if fixFile != "" {
 		request.FixFile = fixFile
+	}
+
+	if request.NumberSelect, err = cmd.Flags().GetBool("numbers"); err != nil {
+		return nil, fmt.Errorf("invalid numbers flag: %w", err)
 	}
 
 	return request, nil

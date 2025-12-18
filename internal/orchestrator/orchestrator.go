@@ -1,15 +1,18 @@
 package orchestrator
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"golang.org/x/term"
 	"prompter-cli/internal/config"
 	"prompter-cli/internal/interfaces"
 	"prompter-cli/internal/template"
@@ -28,7 +31,7 @@ func New() *Orchestrator {
 	return &Orchestrator{
 		configManager:     config.NewManager(),
 		templateProcessor: template.NewProcessor(""),
-		outputHandler:     NewOutputHandler(), // We'll implement this
+		outputHandler:     NewOutputHandler(),
 	}
 }
 
@@ -159,7 +162,7 @@ func (o *Orchestrator) generateNormalPrompt(request *models.PromptRequest, cfg *
 // generateFixModePrompt generates a prompt in fix mode
 func (o *Orchestrator) generateFixModePrompt(request *models.PromptRequest, cfg *interfaces.Config) (string, error) {
 	// Load fix content from file, re-run command, or stdin
-	fixContent, err := o.loadFixContent(request.FixFile, request.Interactive)
+	fixContent, err := o.loadFixContent(request.FixFile, request.Interactive, request.NumberSelect)
 	if err != nil {
 		fixErr := NewFixModeError(request.FixFile, err)
 		return "", RecoverFromError(fixErr)
@@ -250,12 +253,10 @@ func (o *Orchestrator) formatContent(request *models.PromptRequest) string {
 	return strings.Join(parts, "\n")
 }
 
-
-
 // buildTemplateData builds the template data context
 func (o *Orchestrator) buildTemplateData(request *models.PromptRequest, cfg *interfaces.Config) (*interfaces.TemplateData, error) {
 	cwd, _ := os.Getwd()
-	
+
 	// Build environment map
 	envMap := make(map[string]string)
 	for _, env := range os.Environ() {
@@ -267,13 +268,13 @@ func (o *Orchestrator) buildTemplateData(request *models.PromptRequest, cfg *int
 
 	// Build config map
 	configMap := map[string]interface{}{
-		"prompts_location":    cfg.PromptsLocation,
-		"editor":              cfg.Editor,
-		"default_pre":         cfg.DefaultPre,
-		"default_post":        cfg.DefaultPost,
-		"fix_file":            cfg.FixFile,
-		"directory_strategy":  cfg.DirectoryStrategy,
-		"target":              cfg.Target,
+		"prompts_location":   cfg.PromptsLocation,
+		"editor":             cfg.Editor,
+		"default_pre":        cfg.DefaultPre,
+		"default_post":       cfg.DefaultPost,
+		"fix_file":           cfg.FixFile,
+		"directory_strategy": cfg.DirectoryStrategy,
+		"target":             cfg.Target,
 	}
 
 	// Build git info
@@ -284,7 +285,7 @@ func (o *Orchestrator) buildTemplateData(request *models.PromptRequest, cfg *int
 		Enabled: request.FixMode,
 	}
 	if request.FixMode && request.FixFile != "" {
-		if content, err := o.loadFixContent(request.FixFile, request.Interactive); err == nil {
+		if content, err := o.loadFixContent(request.FixFile, request.Interactive, request.NumberSelect); err == nil {
 			fixInfo.Raw = content
 			// Try to parse command and output (simple implementation)
 			lines := strings.Split(content, "\n")
@@ -312,7 +313,7 @@ func (o *Orchestrator) buildTemplateData(request *models.PromptRequest, cfg *int
 // buildGitInfo builds git repository information
 func (o *Orchestrator) buildGitInfo() interfaces.GitInfo {
 	gitInfo := interfaces.GitInfo{}
-	
+
 	// This is a simple implementation - in a real scenario we'd use git libraries
 	// For now, we'll just try to detect if we're in a git repo
 	if _, err := os.Stat(".git"); err == nil {
@@ -324,31 +325,31 @@ func (o *Orchestrator) buildGitInfo() interfaces.GitInfo {
 		gitInfo.Commit = "unknown"
 		gitInfo.Dirty = false
 	}
-	
+
 	return gitInfo
 }
 
 // loadFixContent loads content from the fix file, re-runs last command, or reads from stdin
-func (o *Orchestrator) loadFixContent(fixFile string, interactive bool) (string, error) {
+func (o *Orchestrator) loadFixContent(fixFile string, interactive bool, numberSelect bool) (string, error) {
 	if fixFile != "" {
 		// Read from specified file
 		content, err := os.ReadFile(fixFile)
 		if err != nil {
 			return "", err // Let the caller wrap this with appropriate error type
 		}
-		
+
 		trimmedContent := strings.TrimSpace(string(content))
 		if trimmedContent == "" {
 			return "", fmt.Errorf("fix file is empty")
 		}
-		
+
 		return trimmedContent, nil
 	}
-	
+
 	// No fix file specified - try to re-run the last command
 	if interactive {
 		// Interactive mode: prompt user to re-run last command
-		return o.promptAndRerunLastCommand()
+		return o.promptAndRerunLastCommand(numberSelect)
 	} else {
 		// Non-interactive mode: automatically re-run last command
 		return o.rerunLastCommand()
@@ -366,12 +367,12 @@ func (o *Orchestrator) captureTerminalOutput() (string, error) {
 	if content, err := o.tryAdvancedTerminalCapture(); err == nil && content != "" {
 		return content, nil
 	}
-	
+
 	// Try to get recent shell history as fallback
 	if content, err := o.tryShellHistory(); err == nil && content != "" {
 		return content, nil
 	}
-	
+
 	// Provide helpful error message
 	return "", fmt.Errorf(`unable to capture terminal output automatically.
 
@@ -397,23 +398,21 @@ func (o *Orchestrator) tryShellHistory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Check for zsh history
 	historyFile := filepath.Join(homeDir, ".zsh_history")
 	if _, err := os.Stat(historyFile); err == nil {
 		return o.readRecentHistory(historyFile, "zsh")
 	}
-	
+
 	// Check for bash history
 	historyFile = filepath.Join(homeDir, ".bash_history")
 	if _, err := os.Stat(historyFile); err == nil {
 		return o.readRecentHistory(historyFile, "bash")
 	}
-	
+
 	return "", fmt.Errorf("no shell history found")
 }
-
-
 
 // readRecentHistory reads recent commands from shell history
 func (o *Orchestrator) readRecentHistory(historyFile, shell string) (string, error) {
@@ -421,22 +420,22 @@ func (o *Orchestrator) readRecentHistory(historyFile, shell string) (string, err
 	if err != nil {
 		return "", err
 	}
-	
+
 	lines := strings.Split(string(content), "\n")
 	if len(lines) < 2 {
 		return "", fmt.Errorf("insufficient history")
 	}
-	
+
 	// Get the last few commands, excluding the current prompter command
 	var recentLines []string
-	
+
 	// Work backwards through history to find recent commands
 	for i := len(lines) - 1; i >= 0 && len(recentLines) < 5; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		
+
 		// For zsh, remove timestamp if present
 		if shell == "zsh" && strings.Contains(line, ":") {
 			parts := strings.SplitN(line, ";", 2)
@@ -444,49 +443,49 @@ func (o *Orchestrator) readRecentHistory(historyFile, shell string) (string, err
 				line = parts[1]
 			}
 		}
-		
+
 		// Skip the current prompter command to avoid recursion
 		if strings.Contains(line, "prompter") && strings.Contains(line, "--fix") {
 			continue
 		}
-		
+
 		recentLines = append([]string{"$ " + line}, recentLines...)
 	}
-	
+
 	if len(recentLines) == 0 {
 		return "", fmt.Errorf("no recent commands found")
 	}
-	
+
 	// Add a note about output capture limitation
 	result := strings.Join(recentLines, "\n")
 	result += "\n\n# Note: Command output not captured. For full output capture, use: command 2>&1 | tee /tmp/output.txt && ./prompter --fix --yes"
-	
+
 	return result, nil
 }
 
 // promptAndRerunLastCommand prompts user to re-run the last command and captures output
-func (o *Orchestrator) promptAndRerunLastCommand() (string, error) {
+func (o *Orchestrator) promptAndRerunLastCommand(numberSelect bool) (string, error) {
 	// Get the last command from history
 	lastCmd, err := o.getLastCommand()
 	if err != nil {
 		return "", fmt.Errorf("failed to get last command: %w", err)
 	}
-	
+
 	// Prompt user to confirm re-running the command
-	prompt := &survey.Confirm{
-		Message: fmt.Sprintf("Re-run last command to capture output?\n  $ %s", lastCmd),
-		Default: true,
-	}
-	
-	var confirmed bool
-	if err := survey.AskOne(prompt, &confirmed); err != nil {
+	confirmed, err := o.selectYesNo(
+		fmt.Sprintf("Re-run last command to capture output?\n  $ %s", lastCmd),
+		"This will execute the command and capture its output for fixing",
+		true, // default to Yes
+		numberSelect,
+	)
+	if err != nil {
 		return "", fmt.Errorf("failed to get user confirmation: %w", err)
 	}
-	
+
 	if !confirmed {
 		return "", fmt.Errorf("user declined to re-run command")
 	}
-	
+
 	// Execute the command and capture output
 	return o.executeAndCaptureCommand(lastCmd)
 }
@@ -498,9 +497,9 @@ func (o *Orchestrator) rerunLastCommand() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get last command: %w", err)
 	}
-	
+
 	fmt.Printf("Re-running last command: %s\n", lastCmd)
-	
+
 	// Execute the command and capture output
 	return o.executeAndCaptureCommand(lastCmd)
 }
@@ -511,19 +510,19 @@ func (o *Orchestrator) getLastCommand() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Check for zsh history first
 	historyFile := filepath.Join(homeDir, ".zsh_history")
 	if _, err := os.Stat(historyFile); err == nil {
 		return o.getLastCommandFromHistory(historyFile, "zsh")
 	}
-	
+
 	// Check for bash history
 	historyFile = filepath.Join(homeDir, ".bash_history")
 	if _, err := os.Stat(historyFile); err == nil {
 		return o.getLastCommandFromHistory(historyFile, "bash")
 	}
-	
+
 	return "", fmt.Errorf("no shell history found")
 }
 
@@ -533,16 +532,16 @@ func (o *Orchestrator) getLastCommandFromHistory(historyFile, shell string) (str
 	if err != nil {
 		return "", err
 	}
-	
+
 	lines := strings.Split(string(content), "\n")
-	
+
 	// Work backwards to find the last non-prompter command
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		
+
 		// For zsh, remove timestamp if present
 		if shell == "zsh" && strings.Contains(line, ":") {
 			parts := strings.SplitN(line, ";", 2)
@@ -550,18 +549,18 @@ func (o *Orchestrator) getLastCommandFromHistory(historyFile, shell string) (str
 				line = parts[1]
 			}
 		}
-		
+
 		// Skip prompter commands to avoid recursion
 		if strings.Contains(line, "prompter") && strings.Contains(line, "--fix") {
 			continue
 		}
-		
+
 		// Skip empty lines and comments
 		if line != "" && !strings.HasPrefix(line, "#") {
 			return line, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("no suitable command found in history")
 }
 
@@ -569,17 +568,17 @@ func (o *Orchestrator) getLastCommandFromHistory(historyFile, shell string) (str
 func (o *Orchestrator) executeAndCaptureCommand(command string) (string, error) {
 	// Execute the command using the shell
 	cmd := exec.Command("sh", "-c", command)
-	
+
 	// Capture both stdout and stderr
 	output, _ := cmd.CombinedOutput()
-	
+
 	// Format the result with command and output separated by a blank line
 	var result strings.Builder
 	result.WriteString("$ ")
 	result.WriteString(command)
 	result.WriteString("\n\n")
 	result.Write(output)
-	
+
 	return strings.TrimSpace(result.String()), nil
 }
 
@@ -606,13 +605,13 @@ func (o *Orchestrator) OutputPrompt(prompt string, request *models.PromptRequest
 			return RecoverFromError(outputErr)
 		}
 		fmt.Println("Prompt copied to clipboard")
-		
+
 	case target == "stdout":
 		if err := o.outputHandler.WriteToStdout(prompt); err != nil {
 			outputErr := NewOutputError(target, err)
 			return RecoverFromError(outputErr)
 		}
-		
+
 	case strings.HasPrefix(target, "file:"):
 		filePath := strings.TrimPrefix(target, "file:")
 		if err := o.outputHandler.WriteToFile(prompt, filePath); err != nil {
@@ -620,7 +619,7 @@ func (o *Orchestrator) OutputPrompt(prompt string, request *models.PromptRequest
 			return RecoverFromError(outputErr)
 		}
 		fmt.Printf("Prompt written to %s\n", filePath)
-		
+
 	default:
 		return RecoverFromError(NewValidationError("target", target, "unsupported output target"))
 	}
@@ -681,6 +680,127 @@ func (o *Orchestrator) validateRequest(request *models.PromptRequest) error {
 	return nil
 }
 
+// selectYesNo handles yes/no selection with optional number key support
+func (o *Orchestrator) selectYesNo(message, help string, defaultValue, numberSelect bool) (bool, error) {
+	if numberSelect {
+		return o.selectYesNoWithNumbers(message, help, defaultValue)
+	}
+
+	// Use regular survey confirm
+	prompt := &survey.Confirm{
+		Message: message,
+		Help:    help,
+		Default: defaultValue,
+	}
+
+	var result bool
+	if err := survey.AskOne(prompt, &result); err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+// selectYesNoWithNumbers displays numbered yes/no options and allows instant selection
+func (o *Orchestrator) selectYesNoWithNumbers(message, help string, defaultValue bool) (bool, error) {
+	fmt.Printf("\n%s\n", message)
+	if help != "" {
+		fmt.Printf("  %s (Press number key for instant selection)\n", help)
+	}
+	fmt.Println()
+
+	// Display options with default marked
+	if defaultValue {
+		fmt.Println("  1. Yes (default)")
+		fmt.Println("  2. No")
+	} else {
+		fmt.Println("  1. Yes")
+		fmt.Println("  2. No (default)")
+	}
+	fmt.Println()
+
+	// Check if we're in a terminal that supports raw mode
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		// Fallback to regular input if not in a terminal
+		return o.fallbackYesNoSelection(defaultValue)
+	}
+
+	// Save the current terminal state
+	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	if err != nil {
+		// Fallback to regular input if raw mode fails
+		return o.fallbackYesNoSelection(defaultValue)
+	}
+	defer term.Restore(int(syscall.Stdin), oldState)
+
+	fmt.Print("Select option: ")
+
+	// Read single character input
+	buffer := make([]byte, 1)
+	for {
+		_, err := os.Stdin.Read(buffer)
+		if err != nil {
+			return false, err
+		}
+
+		char := buffer[0]
+
+		// Handle number keys
+		if char == '1' {
+			fmt.Printf("1\n")
+			return true, nil // Yes
+		}
+		if char == '2' {
+			fmt.Printf("2\n")
+			return false, nil // No
+		}
+
+		// Handle Enter key (use default)
+		if char == '\r' || char == '\n' {
+			fmt.Println()
+			return defaultValue, nil
+		}
+
+		// Handle Escape or Ctrl+C
+		if char == 27 || char == 3 {
+			fmt.Println()
+			return false, fmt.Errorf("selection cancelled")
+		}
+
+		// For any other key, continue waiting
+	}
+}
+
+// fallbackYesNoSelection provides a fallback when raw terminal mode is not available
+func (o *Orchestrator) fallbackYesNoSelection(defaultValue bool) (bool, error) {
+	defaultText := "No"
+	if defaultValue {
+		defaultText = "Yes"
+	}
+
+	fmt.Printf("Enter 1 for Yes, 2 for No, or press Enter for default (%s): ", defaultText)
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultValue, nil
+	}
+
+	switch input {
+	case "1":
+		return true, nil
+	case "2":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid input: please enter 1 for Yes or 2 for No")
+	}
+}
+
 // resolveEditor resolves the editor using precedence rules
 func (o *Orchestrator) resolveEditor(requestEditor, configEditor string) string {
 	// Precedence: --editor flag > $VISUAL > $EDITOR > config editor > nvim > vi
@@ -704,3 +824,4 @@ func (o *Orchestrator) resolveEditor(requestEditor, configEditor string) string 
 	}
 	return "vi" // Final fallback
 }
+
