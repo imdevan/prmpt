@@ -179,6 +179,10 @@ func buildRequestFromFlags(cmd *cobra.Command, args []string) (*models.PromptReq
 }
 
 func main() {
+	// Disable usage on error to show only our custom error messages
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
+	
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

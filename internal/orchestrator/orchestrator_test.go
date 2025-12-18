@@ -150,8 +150,8 @@ func TestNewConfigurationError(t *testing.T) {
 		t.Errorf("Expected guidance to be set")
 	}
 
-	if !strings.Contains(err.Guidance, "configuration file") {
-		t.Errorf("Expected guidance to mention configuration file, got: %s", err.Guidance)
+	if !strings.Contains(err.Guidance, "prompter --help") {
+		t.Errorf("Expected guidance to mention help command, got: %s", err.Guidance)
 	}
 
 	if !errors.Is(err, cause) {

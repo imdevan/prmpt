@@ -28,7 +28,7 @@ type PrompterError struct {
 
 func (e *PrompterError) Error() string {
 	if e.Guidance != "" {
-		return fmt.Sprintf("%s: %s\n\nSuggestion: %s", e.Type, e.Message, e.Guidance)
+		return fmt.Sprintf("%s: %s\n\n%s", e.Type, e.Message, e.Guidance)
 	}
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
@@ -40,15 +40,13 @@ func (e *PrompterError) Unwrap() error {
 // Error constructors with actionable guidance
 
 func NewConfigurationError(message string, cause error) *PrompterError {
-	guidance := "Check your configuration file syntax and ensure all paths exist. " +
-		"Use 'prompter --config /path/to/config.toml' to specify a different config file."
+	guidance := "Run 'prompter --help' for usage information and configuration options."
 	
 	if strings.Contains(message, "permission") {
 		guidance = "Check file permissions for your configuration directory. " +
-			"Ensure you have read/write access to ~/.config/prompter/"
+			"Run 'prompter --help' for more information."
 	} else if strings.Contains(message, "not found") || strings.Contains(message, "does not exist") {
-		guidance = "The configuration file doesn't exist. Create ~/.config/prompter/config.toml " +
-			"or specify a different path with --config flag."
+		guidance = "Configuration file not found. Run 'prompter --help' to see default locations and options."
 	}
 	
 	return &PrompterError{
@@ -61,15 +59,12 @@ func NewConfigurationError(message string, cause error) *PrompterError {
 
 func NewTemplateError(templateName string, cause error) *PrompterError {
 	message := fmt.Sprintf("failed to process template '%s'", templateName)
-	guidance := fmt.Sprintf("Ensure the template '%s.md' exists in prompts/pre/ or prompts/post/ directory. " +
-		"Check template syntax for valid Go template format with {{ }} delimiters.", templateName)
+	guidance := "Run 'prompter --help' for template usage and configuration."
 	
 	if strings.Contains(cause.Error(), "not found") {
-		guidance = fmt.Sprintf("Template '%s' not found. Available templates can be listed by checking " +
-			"the prompts/pre/ and prompts/post/ directories. Template names are case-insensitive.", templateName)
+		guidance = fmt.Sprintf("Template '%s' not found. Run 'prompter --help' for template setup.", templateName)
 	} else if strings.Contains(cause.Error(), "parse") || strings.Contains(cause.Error(), "syntax") {
-		guidance = fmt.Sprintf("Template '%s' has syntax errors. Check for proper {{ }} delimiters " +
-			"and valid Go template syntax. Ensure all variables are properly referenced.", templateName)
+		guidance = fmt.Sprintf("Template '%s' has syntax errors. Run 'prompter --help' for template format.", templateName)
 	}
 	
 	return &PrompterError{
@@ -82,15 +77,12 @@ func NewTemplateError(templateName string, cause error) *PrompterError {
 
 func NewContentCollectionError(path string, cause error) *PrompterError {
 	message := fmt.Sprintf("failed to collect content from '%s'", path)
-	guidance := "Ensure the file or directory exists and you have read permissions. " +
-		"Check that the path is correct and accessible."
+	guidance := "Run 'prompter --help' for file and directory usage options."
 	
 	if strings.Contains(cause.Error(), "permission") {
-		guidance = fmt.Sprintf("Permission denied accessing '%s'. Ensure you have read permissions " +
-			"for the file/directory and all parent directories.", path)
+		guidance = fmt.Sprintf("Permission denied accessing '%s'. Run 'prompter --help' for usage.", path)
 	} else if strings.Contains(cause.Error(), "not found") || strings.Contains(cause.Error(), "does not exist") {
-		guidance = fmt.Sprintf("Path '%s' does not exist. Check the path spelling and ensure " +
-			"the file or directory exists.", path)
+		guidance = fmt.Sprintf("Path '%s' not found. Run 'prompter --help' for usage.", path)
 	}
 	
 	return &PrompterError{
@@ -103,15 +95,12 @@ func NewContentCollectionError(path string, cause error) *PrompterError {
 
 func NewFixModeError(fixFile string, cause error) *PrompterError {
 	message := fmt.Sprintf("fix mode failed with file '%s'", fixFile)
-	guidance := fmt.Sprintf("Ensure the fix file '%s' exists and contains captured command output. " +
-		"Capture output using: command 2>&1 | tee %s", fixFile, fixFile)
+	guidance := "Run 'prompter --help' for fix mode usage and examples."
 	
 	if strings.Contains(cause.Error(), "not found") || strings.Contains(cause.Error(), "does not exist") {
-		guidance = fmt.Sprintf("Fix file '%s' does not exist. To use fix mode:\n" +
-			"1. Run your failing command: your-command 2>&1 | tee %s\n" +
-			"2. Then run: prompter --fix", fixFile, fixFile)
+		guidance = "Fix file not found. Run 'prompter --help' for fix mode setup."
 	} else if strings.Contains(cause.Error(), "empty") {
-		guidance = fmt.Sprintf("Fix file '%s' is empty. Ensure you captured the command output properly.", fixFile)
+		guidance = "Fix file is empty. Run 'prompter --help' for fix mode usage."
 	}
 	
 	return &PrompterError{
@@ -124,18 +113,14 @@ func NewFixModeError(fixFile string, cause error) *PrompterError {
 
 func NewOutputError(target string, cause error) *PrompterError {
 	message := fmt.Sprintf("failed to output to target '%s'", target)
-	guidance := "Check that the output target is valid and accessible."
+	guidance := "Run 'prompter --help' for output target options."
 	
 	if target == "clipboard" {
-		guidance = "Clipboard access failed. Ensure you're running in a graphical environment " +
-			"or try using --target stdout instead."
+		guidance = "Clipboard access failed. Try --target stdout or run 'prompter --help' for options."
 	} else if strings.HasPrefix(target, "file:") {
-		filePath := strings.TrimPrefix(target, "file:")
-		guidance = fmt.Sprintf("Failed to write to file '%s'. Check that the directory exists " +
-			"and you have write permissions.", filePath)
+		guidance = "File write failed. Run 'prompter --help' for output options."
 	} else if strings.Contains(cause.Error(), "editor") {
-		guidance = "Editor launch failed. Check that the specified editor is installed and in PATH. " +
-			"Try setting EDITOR environment variable or using --editor flag."
+		guidance = "Editor launch failed. Run 'prompter --help' for editor configuration."
 	}
 	
 	return &PrompterError{
@@ -148,21 +133,17 @@ func NewOutputError(target string, cause error) *PrompterError {
 
 func NewValidationError(field string, value interface{}, reason string) *PrompterError {
 	message := fmt.Sprintf("validation failed for %s: %v (%s)", field, value, reason)
-	guidance := "Check the input value and ensure it meets the required format."
+	guidance := "Run 'prompter --help' for usage information."
 	
 	switch field {
 	case "base_prompt":
-		guidance = "Base prompt is required in non-interactive mode. Provide a prompt as argument " +
-			"or remove --yes flag to use interactive mode."
+		guidance = "Base prompt required in non-interactive mode. Run 'prompter --help' for options."
 	case "target":
-		guidance = "Target must be 'clipboard', 'stdout', or 'file:/path/to/file'. " +
-			"Example: --target file:/tmp/prompt.txt"
+		guidance = "Invalid target. Run 'prompter --help' for valid output targets."
 	case "config_path":
-		guidance = "Configuration file path must be valid and accessible. " +
-			"Ensure the file exists and you have read permissions."
+		guidance = "Invalid config path. Run 'prompter --help' for configuration options."
 	case "template_name":
-		guidance = "Template name must not be empty and should correspond to a .md file " +
-			"in prompts/pre/ or prompts/post/ directory."
+		guidance = "Invalid template name. Run 'prompter --help' for template usage."
 	}
 	
 	return &PrompterError{
@@ -187,7 +168,7 @@ func RecoverFromError(err error) error {
 		return &PrompterError{
 			Type:     errors.New("unknown error"),
 			Message:  err.Error(),
-			Guidance: "An unexpected error occurred. Please check your inputs and try again.",
+			Guidance: "Run 'prompter --help' for usage information.",
 			Cause:    err,
 		}
 	}
@@ -216,14 +197,12 @@ func recoverFromConfigError(err *PrompterError) error {
 	if _, statErr := os.Stat(configDir); os.IsNotExist(statErr) {
 		if mkdirErr := os.MkdirAll(configDir, 0755); mkdirErr != nil {
 			// Add recovery attempt info to guidance
-			err.Guidance += fmt.Sprintf("\n\nAttempted to create config directory '%s' but failed: %v", 
-				configDir, mkdirErr)
+			err.Guidance = "Run 'prompter --help' for configuration help."
 			return err
 		}
 		
 		// Successfully created directory
-		err.Guidance += fmt.Sprintf("\n\nCreated config directory '%s'. You can now create a config.toml file there.", 
-			configDir)
+		err.Guidance = "Config directory created. Run 'prompter --help' for configuration options."
 	}
 	
 	return err
@@ -232,7 +211,7 @@ func recoverFromConfigError(err *PrompterError) error {
 func recoverFromTemplateError(err *PrompterError) error {
 	// For template not found errors, we can suggest continuing without the template
 	if strings.Contains(err.Message, "not found") {
-		err.Guidance += "\n\nYou can continue without this template by omitting the --pre or --post flag."
+		err.Guidance = "Template not found. Run 'prompter --help' for template setup or omit template flags."
 	}
 	return err
 }
@@ -240,7 +219,7 @@ func recoverFromTemplateError(err *PrompterError) error {
 func recoverFromOutputError(err *PrompterError) error {
 	// For clipboard errors, suggest stdout fallback
 	if strings.Contains(err.Message, "clipboard") {
-		err.Guidance += "\n\nTry using --target stdout as a fallback."
+		err.Guidance = "Clipboard failed. Try --target stdout or run 'prompter --help' for options."
 	}
 	return err
 }
