@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/atotto/clipboard"
 	"golang.org/x/term"
 	"prompter-cli/pkg/models"
 )
@@ -32,8 +33,15 @@ func (p *Prompter) CollectMissingInputs(request *models.PromptRequest) error {
 		return nil // Skip interactive prompts in noninteractive mode
 	}
 
-	// Collect base prompt if missing and not in fix mode
-	if request.BasePrompt == "" && !request.FixMode {
+	// Handle clipboard reading - append to existing prompt or use as base prompt
+	if request.FromClipboard && !request.FixMode {
+		if err := p.appendClipboardToPrompt(request); err != nil {
+			return fmt.Errorf("failed to read from clipboard: %w", err)
+		}
+	}
+
+	// Collect base prompt if missing and not in fix mode (only in interactive mode)
+	if request.BasePrompt == "" && !request.FixMode && request.Interactive {
 		if err := p.promptForBasePrompt(request); err != nil {
 			return fmt.Errorf("failed to collect base prompt: %w", err)
 		}
@@ -65,6 +73,35 @@ func (p *Prompter) CollectMissingInputs(request *models.PromptRequest) error {
 		return fmt.Errorf("user cancelled operation: %w", err)
 	}
 
+	return nil
+}
+
+// appendClipboardToPrompt reads from clipboard and appends to existing prompt or uses as base prompt
+func (p *Prompter) appendClipboardToPrompt(request *models.PromptRequest) error {
+	clipboardContent, err := clipboard.ReadAll()
+	if err != nil {
+		return fmt.Errorf("failed to read from clipboard: %w", err)
+	}
+
+	clipboardContent = strings.TrimSpace(clipboardContent)
+	if clipboardContent == "" {
+		return fmt.Errorf("clipboard is empty")
+	}
+
+	if request.BasePrompt == "" {
+		// No existing prompt, use clipboard content as base prompt
+		request.BasePrompt = clipboardContent
+		if request.Interactive {
+			fmt.Printf("Read base prompt from clipboard: %s\n", truncateString(clipboardContent, 100))
+		}
+	} else {
+		// Append clipboard content to existing prompt
+		request.BasePrompt = request.BasePrompt + "\n\n" + clipboardContent
+		if request.Interactive {
+			fmt.Printf("Appended clipboard content to base prompt: %s\n", truncateString(clipboardContent, 100))
+		}
+	}
+	
 	return nil
 }
 

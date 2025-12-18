@@ -24,7 +24,11 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI tool for assembling AI coding prompts",
 	Long: `Prompter CLI assembles high-quality prompts for AI coding agents by combining 
 base prompts with optional pre/post templates and contextual information from files, 
-directories, and captured command output.`,
+directories, and captured command output.
+
+The base prompt can be provided as an argument, entered interactively, or read from 
+clipboard using --clipboard. When both an argument and --clipboard are provided, 
+the clipboard content is appended to the base prompt.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if version flag is set
@@ -74,6 +78,7 @@ func init() {
 	rootCmd.Flags().BoolP("fix", "f", false, "fix mode - process captured command output")
 	rootCmd.Flags().String("fix-file", "", "file containing command output to fix (overrides config)")
 	rootCmd.Flags().BoolP("numbers", "n", false, "enable number key selection for templates")
+	rootCmd.Flags().BoolP("clipboard", "b", false, "append clipboard content to prompt (or use as base prompt if none provided)")
 }
 
 // buildRequestFromFlags constructs a PromptRequest from command flags and arguments
@@ -148,6 +153,12 @@ func buildRequestFromFlags(cmd *cobra.Command, args []string) (*models.PromptReq
 	if request.NumberSelect, err = cmd.Flags().GetBool("numbers"); err != nil {
 		return nil, fmt.Errorf("invalid numbers flag: %w", err)
 	}
+
+	if request.FromClipboard, err = cmd.Flags().GetBool("clipboard"); err != nil {
+		return nil, fmt.Errorf("invalid clipboard flag: %w", err)
+	}
+
+
 
 	return request, nil
 }

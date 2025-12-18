@@ -15,6 +15,7 @@ type PromptRequest struct {
 	Interactive     bool     `json:"interactive"`
 	ConfigPath      string   `json:"config_path"`
 	NumberSelect    bool     `json:"number_select"`    // Enable number key selection for templates
+	FromClipboard   bool     `json:"from_clipboard"`   // Read base prompt from clipboard
 }
 
 // NewPromptRequest creates a new PromptRequest with default values

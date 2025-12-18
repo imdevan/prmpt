@@ -68,6 +68,30 @@ func TestBuildRequestFromFlags(t *testing.T) {
 				Files:        []string{},
 			},
 		},
+		{
+			name: "clipboard mode",
+			boolFlags: map[string]bool{
+				"clipboard": true,
+			},
+			expected: &models.PromptRequest{
+				Interactive:   true,
+				FromClipboard: true,
+				Files:         []string{},
+			},
+		},
+		{
+			name: "clipboard with base prompt",
+			args: []string{"test prompt"},
+			boolFlags: map[string]bool{
+				"clipboard": true,
+			},
+			expected: &models.PromptRequest{
+				BasePrompt:    "test prompt",
+				Interactive:   true,
+				FromClipboard: true,
+				Files:         []string{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -86,6 +110,7 @@ func TestBuildRequestFromFlags(t *testing.T) {
 			cmd.Flags().Bool("fix", false, "")
 			cmd.Flags().String("fix-file", "", "")
 			cmd.Flags().BoolP("numbers", "n", false, "")
+			cmd.Flags().BoolP("clipboard", "b", false, "")
 			
 			// Set flag values
 			for flag, value := range tt.flags {
@@ -133,6 +158,10 @@ func TestBuildRequestFromFlags(t *testing.T) {
 			
 			if result.NumberSelect != tt.expected.NumberSelect {
 				t.Errorf("NumberSelect = %v, expected %v", result.NumberSelect, tt.expected.NumberSelect)
+			}
+			
+			if result.FromClipboard != tt.expected.FromClipboard {
+				t.Errorf("FromClipboard = %v, expected %v", result.FromClipboard, tt.expected.FromClipboard)
 			}
 		})
 	}
