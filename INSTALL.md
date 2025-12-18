@@ -66,7 +66,7 @@ prompter version 1.0.0
 Create a configuration file at `~/.config/prompter/config.toml`:
 
 ```toml
-prompts_location = "~/.config/prompter"
+prompts_location = "~/.config/prompter/prompts"
 editor = "nvim"
 default_pre = ""
 default_post = ""
