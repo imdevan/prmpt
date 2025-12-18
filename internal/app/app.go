@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -300,4 +301,47 @@ func getClipboardContent() (string, error) {
 	}
 	
 	return content, nil
+}
+// OpenPromptsDirectory opens the prompts directory in the configured editor
+func OpenPromptsDirectory(request *models.PromptRequest) error {
+	// Create orchestrator to load configuration
+	orch := orchestrator.New()
+
+	// Load configuration to get the prompts location and editor
+	cfg, err := orch.LoadConfiguration(request.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("configuration error: %w", err)
+	}
+
+	// Check if prompts directory exists
+	if _, err := os.Stat(cfg.PromptsLocation); os.IsNotExist(err) {
+		return fmt.Errorf("prompts directory does not exist: %s", contractPath(cfg.PromptsLocation))
+	}
+
+	// Get the editor command
+	editor := cfg.Editor
+	if editor == "" {
+		// Fallback to environment variables
+		if envEditor := os.Getenv("EDITOR"); envEditor != "" {
+			editor = envEditor
+		} else if envEditor := os.Getenv("VISUAL"); envEditor != "" {
+			editor = envEditor
+		} else {
+			return fmt.Errorf("no editor configured. Set 'editor' in config file or EDITOR/VISUAL environment variable")
+		}
+	}
+
+	fmt.Printf("Opening prompts directory in %s: %s\n", editor, contractPath(cfg.PromptsLocation))
+
+	// Execute the editor command
+	cmd := exec.Command(editor, cfg.PromptsLocation)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to open editor: %w", err)
+	}
+
+	return nil
 }

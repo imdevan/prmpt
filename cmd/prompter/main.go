@@ -124,11 +124,28 @@ var addCmd = &cobra.Command{
 	},
 }
 
+var promptsCmd = &cobra.Command{
+	Use:   "prompts",
+	Short: "Open prompts directory in editor",
+	Long:  "Open the configured prompts directory in the default editor for easy template management.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		request := models.NewPromptRequest()
+		
+		// Get config path from flag
+		if configPath, err := cmd.Flags().GetString("config"); err == nil {
+			request.ConfigPath = configPath
+		}
+		
+		return app.OpenPromptsDirectory(request)
+	},
+}
+
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(promptsCmd)
 	
 	// Add command specific flags
 	addCmd.Flags().StringP("pre", "p", "", "create a pre-template with the specified name")
