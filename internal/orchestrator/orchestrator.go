@@ -638,8 +638,8 @@ func (o *Orchestrator) validateRequest(request *models.PromptRequest) error {
 		return NewValidationError("request", nil, "request cannot be nil")
 	}
 
-	// In noninteractive mode, base prompt is required unless in fix mode
-	if !request.Interactive && request.BasePrompt == "" && !request.FixMode {
+	// In noninteractive mode, base prompt is required unless in fix mode or clipboard flag is used
+	if !request.Interactive && request.BasePrompt == "" && !request.FixMode && !request.FromClipboard {
 		return NewValidationError("base_prompt", "", "required in noninteractive mode")
 	}
 
