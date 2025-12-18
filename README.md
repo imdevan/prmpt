@@ -23,6 +23,8 @@ Will rerun the previous shell command and copy the content to the clipboard.
 
 ### Available Commands
 
+Extra helper commands to help manage prompt-templates.
+
 ```
 add         Add a new prompt template
 completion  Generate the autocompletion script for the specified shell
@@ -52,11 +54,6 @@ Lots of useful flags to add files, current directory, cipboard contents and more
 -t, --target string     output target (clipboard, stdout, file:/path)
 -v, --version           print version information
 -y, --yes               noninteractive mode - use defaults without prompts
-```
-A full 
-
-```
-prompter help
 ```
 
 ## Configuration
