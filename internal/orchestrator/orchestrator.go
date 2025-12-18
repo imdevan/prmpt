@@ -194,11 +194,9 @@ func (o *Orchestrator) processTemplate(templateName string, request *models.Prom
 		processor.SetPromptsLocation(cfg.PromptsLocation)
 	}
 
-	// Build template path
-	templatePath := filepath.Join(cfg.PromptsLocation, templateType, templateName+".md")
-
-	// Load template
-	tmpl, err := o.templateProcessor.LoadTemplate(templatePath)
+	// Load template using the template processor's discovery mechanism
+	// The processor will find the correct file (including .default. files)
+	tmpl, err := o.templateProcessor.LoadTemplate(templateName)
 	if err != nil {
 		return "", fmt.Errorf("failed to load template %s: %w", templateName, err)
 	}

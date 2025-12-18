@@ -100,6 +100,119 @@ func TestProcessor_LoadTemplate(t *testing.T) {
 	}
 }
 
+func TestProcessor_LoadTemplate_WithDefaultTemplates(t *testing.T) {
+	// Create a temporary directory for test templates
+	tempDir := t.TempDir()
+	
+	// Create pre directory
+	preDir := filepath.Join(tempDir, "pre")
+	if err := os.MkdirAll(preDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	
+	// Create test template files including default templates
+	testTemplate := "Hello {{.Prompt}}!"
+	
+	// Regular template
+	regularPath := filepath.Join(preDir, "regular.md")
+	if err := os.WriteFile(regularPath, []byte(testTemplate), 0644); err != nil {
+		t.Fatal(err)
+	}
+	
+	// Default template
+	defaultPath := filepath.Join(preDir, "example.default.md")
+	if err := os.WriteFile(defaultPath, []byte(testTemplate), 0644); err != nil {
+		t.Fatal(err)
+	}
+	
+	processor := NewProcessor(tempDir)
+	
+	tests := []struct {
+		name        string
+		templateName string
+		wantError   bool
+		description string
+	}{
+		{
+			name:        "load regular template",
+			templateName: "regular",
+			wantError:   false,
+			description: "should load regular template by name",
+		},
+		{
+			name:        "load default template by display name",
+			templateName: "example",
+			wantError:   false,
+			description: "should load example.default.md when searching for 'example'",
+		},
+		{
+			name:        "load default template by full stem",
+			templateName: "example.default",
+			wantError:   false,
+			description: "should also load by full stem name",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl, err := processor.LoadTemplate(tt.templateName)
+			
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			
+			if tmpl == nil {
+				t.Errorf("expected template but got nil")
+			}
+		})
+	}
+}
+
+func TestProcessor_LoadTemplate_RealStrictTemplate(t *testing.T) {
+	// Test with the real strict.default.md file
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("Cannot get user home directory")
+		return
+	}
+	
+	promptsPath := filepath.Join(homeDir, "prompts")
+	if _, err := os.Stat(promptsPath); os.IsNotExist(err) {
+		t.Skip("Real prompts directory doesn't exist")
+		return
+	}
+	
+	// Check if strict.default.md exists
+	strictPath := filepath.Join(promptsPath, "post", "strict.default.md")
+	if _, err := os.Stat(strictPath); os.IsNotExist(err) {
+		t.Skip("strict.default.md doesn't exist")
+		return
+	}
+	
+	processor := NewProcessor(promptsPath)
+	
+	// Try to load the template by display name "strict"
+	tmpl, err := processor.LoadTemplate("strict")
+	if err != nil {
+		t.Errorf("Failed to load strict template: %v", err)
+		return
+	}
+	
+	if tmpl == nil {
+		t.Error("Expected template but got nil")
+	}
+	
+	t.Logf("✓ Successfully loaded 'strict' template from strict.default.md")
+}
+
 func TestProcessor_Execute(t *testing.T) {
 	processor := NewProcessor("")
 	

@@ -72,9 +72,27 @@ func (p *Processor) discoverTemplate(name string) (string, error) {
 			ext := filepath.Ext(filename)
 			stem := strings.TrimSuffix(filename, ext)
 
-			// Case-insensitive comparison
+			// Case-insensitive comparison - first try exact match
 			if strings.EqualFold(stem, name) {
 				return filepath.Join(dir, filename), nil
+			}
+
+			// Also check if this is a default template that matches the display name
+			if strings.Contains(stem, ".default.") {
+				// Strip the .default. part to get the display name
+				displayName := strings.ReplaceAll(stem, ".default.", ".")
+				displayName = strings.Trim(displayName, ".")
+				
+				if strings.EqualFold(displayName, name) {
+					return filepath.Join(dir, filename), nil
+				}
+			} else if strings.HasSuffix(stem, ".default") {
+				// Handle case where .default is at the end
+				displayName := strings.TrimSuffix(stem, ".default")
+				
+				if strings.EqualFold(displayName, name) {
+					return filepath.Join(dir, filename), nil
+				}
 			}
 		}
 	}
