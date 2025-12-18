@@ -165,9 +165,6 @@ func (o *Orchestrator) generateFixModePrompt(request *models.PromptRequest, cfg 
 		return "", RecoverFromError(fixErr)
 	}
 
-	// Prepend "Please fix" to the content
-	fixContentWithPrefix := "Please fix" + fixContent
-
 	var promptParts []string
 
 	// Try to load fix.md template, fallback to default
@@ -181,9 +178,11 @@ func (o *Orchestrator) generateFixModePrompt(request *models.PromptRequest, cfg 
 		promptParts = append(promptParts, preContent)
 	}
 
-	// Add fix content with "Please fix" prefix wrapped in markdown code block
-	wrappedContent := fmt.Sprintf("```\n%s\n```", fixContentWithPrefix)
-	promptParts = append(promptParts, wrappedContent)
+	// Add "Please fix" as a separate part
+	promptParts = append(promptParts, "Please fix")
+
+	// Add the captured content (command + output) as a separate part
+	promptParts = append(promptParts, fixContent)
 
 	return strings.Join(promptParts, "\n\n"), nil
 }
@@ -570,36 +569,20 @@ func (o *Orchestrator) getLastCommandFromHistory(historyFile, shell string) (str
 
 // executeAndCaptureCommand executes a command and captures both stdout and stderr
 func (o *Orchestrator) executeAndCaptureCommand(command string) (string, error) {
-	// Create a temporary file to capture output
-	tmpFile, err := os.CreateTemp("", "prompter-capture-*.txt")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-	
-	// Write the command to the output file first
-	fmt.Fprintf(tmpFile, "$ %s\n", command)
-	tmpFile.Sync()
-	
 	// Execute the command using the shell
 	cmd := exec.Command("sh", "-c", command)
 	
 	// Capture both stdout and stderr
-	output, err := cmd.CombinedOutput()
+	output, _ := cmd.CombinedOutput()
 	
-	// Write the output to the temp file
-	tmpFile.Write(output)
-	tmpFile.Sync()
+	// Format the result with command and output separated by a blank line
+	var result strings.Builder
+	result.WriteString("$ ")
+	result.WriteString(command)
+	result.WriteString("\n\n")
+	result.Write(output)
 	
-	// Read the complete content (command + output)
-	tmpFile.Seek(0, 0)
-	fullContent, err := io.ReadAll(tmpFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to read captured output: %w", err)
-	}
-	
-	return strings.TrimSpace(string(fullContent)), nil
+	return strings.TrimSpace(result.String()), nil
 }
 
 // OutputPrompt handles the final output of the generated prompt
