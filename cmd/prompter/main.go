@@ -118,8 +118,9 @@ var addCmd = &cobra.Command{
 		preName, _ := cmd.Flags().GetString("pre")
 		postName, _ := cmd.Flags().GetString("post")
 		fromClipboard, _ := cmd.Flags().GetBool("clipboard")
+		overwrite, _ := cmd.Flags().GetBool("overwrite")
 		
-		return app.AddTemplate(request, content, preName, postName, fromClipboard)
+		return app.AddTemplate(request, content, preName, postName, fromClipboard, overwrite)
 	},
 }
 
@@ -133,6 +134,7 @@ func init() {
 	addCmd.Flags().StringP("pre", "p", "", "create a pre-template with the specified name")
 	addCmd.Flags().StringP("post", "o", "", "create a post-template with the specified name")
 	addCmd.Flags().BoolP("clipboard", "b", false, "create template from clipboard content")
+	addCmd.Flags().BoolP("overwrite", "r", false, "overwrite existing template file without prompting")
 
 	// Global flags
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default ~/.config/prompter/config.toml)")

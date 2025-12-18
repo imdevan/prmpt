@@ -184,7 +184,7 @@ func contractPath(path string) string {
 	return path
 }
 // AddTemplate adds a new prompt template
-func AddTemplate(request *models.PromptRequest, content, preName, postName string, fromClipboard bool) error {
+func AddTemplate(request *models.PromptRequest, content, preName, postName string, fromClipboard, overwrite bool) error {
 	// Create orchestrator to load configuration
 	orch := orchestrator.New()
 
@@ -261,13 +261,15 @@ func AddTemplate(request *models.PromptRequest, content, preName, postName strin
 	
 	// Check if file already exists
 	if _, err := os.Stat(templatePath); err == nil {
-		if request.Interactive {
+		if overwrite {
+			// --overwrite flag is set, proceed without prompting
+		} else if request.Interactive {
 			prompter := interactive.NewPrompter(cfg.PromptsLocation)
-			overwrite, err := prompter.ConfirmOverwrite(templatePath)
+			shouldOverwrite, err := prompter.ConfirmOverwrite(templatePath)
 			if err != nil {
 				return fmt.Errorf("failed to get overwrite confirmation: %w", err)
 			}
-			if !overwrite {
+			if !shouldOverwrite {
 				fmt.Println("Template creation cancelled.")
 				return nil
 			}
