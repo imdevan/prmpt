@@ -23,10 +23,10 @@ func NewManager() *Manager {
 	v.SetEnvPrefix("PROMPTER")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Set defaults
 	setDefaults(v)
-	
+
 	return &Manager{
 		v:     v,
 		flags: make(map[string]interface{}),
@@ -42,7 +42,7 @@ func (m *Manager) SetConfigPath(path string) {
 
 // setDefaults sets the default configuration values
 func setDefaults(v *viper.Viper) {
-	v.SetDefault("prompts_location", "~/.config/prompter")
+	v.SetDefault("prompts_location", "~/.config/prompter/prompts")
 	v.SetDefault("editor", "nvim")
 	v.SetDefault("default_pre", "")
 	v.SetDefault("default_post", "")
@@ -62,9 +62,7 @@ func (m *Manager) Load(path string) (*interfaces.Config, error) {
 		}
 		path = filepath.Join(homeDir, ".config", "prompter", "config.toml")
 	}
-	
 
-	
 	// Expand tilde in path
 	if strings.HasPrefix(path, "~/") {
 		homeDir, err := os.UserHomeDir()
@@ -73,19 +71,19 @@ func (m *Manager) Load(path string) (*interfaces.Config, error) {
 		}
 		path = filepath.Join(homeDir, path[2:])
 	}
-	
+
 	// Check if config file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Config file doesn't exist, use defaults
 		return m.getConfigFromViper(), nil
 	}
-	
+
 	m.v.SetConfigFile(path)
-	
+
 	if err := m.v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-	
+
 	return m.getConfigFromViper(), nil
 }
 
@@ -97,10 +95,10 @@ func (m *Manager) SetFlag(key string, value interface{}) {
 // Resolve applies precedence rules (flags > env > config > defaults)
 func (m *Manager) Resolve() (*interfaces.Config, error) {
 	config := m.getConfigFromViper()
-	
+
 	// Apply flag overrides (highest precedence)
 	m.applyFlagOverrides(config)
-	
+
 	return config, nil
 }
 
@@ -111,45 +109,43 @@ func (m *Manager) applyFlagOverrides(config *interfaces.Config) {
 			config.PromptsLocation = expandPath(str)
 		}
 	}
-	
+
 	if val, exists := m.flags["editor"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.Editor = str
 		}
 	}
-	
+
 	if val, exists := m.flags["default_pre"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.DefaultPre = str
 		}
 	}
-	
+
 	if val, exists := m.flags["default_post"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.DefaultPost = str
 		}
 	}
-	
+
 	if val, exists := m.flags["fix_file"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.FixFile = expandPath(str)
 		}
 	}
-	
 
-	
 	if val, exists := m.flags["directory_strategy"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.DirectoryStrategy = str
 		}
 	}
-	
+
 	if val, exists := m.flags["target"]; exists && val != nil {
 		if str, ok := val.(string); ok && str != "" {
 			config.Target = str
 		}
 	}
-	
+
 	if val, exists := m.flags["interactive_default"]; exists && val != nil {
 		if b, ok := val.(bool); ok {
 			config.InteractiveDefault = b
@@ -162,9 +158,7 @@ func (m *Manager) Validate(config *interfaces.Config) error {
 	if config == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
-	
 
-	
 	// Validate directory strategy
 	validStrategies := map[string]bool{
 		"git":        true,
@@ -173,7 +167,7 @@ func (m *Manager) Validate(config *interfaces.Config) error {
 	if !validStrategies[config.DirectoryStrategy] {
 		return fmt.Errorf("invalid directory_strategy: %s (must be 'git' or 'filesystem')", config.DirectoryStrategy)
 	}
-	
+
 	// Validate target
 	validTargets := map[string]bool{
 		"clipboard": true,
@@ -183,7 +177,7 @@ func (m *Manager) Validate(config *interfaces.Config) error {
 	if !validTargets[config.Target] && !strings.HasPrefix(config.Target, "file:") {
 		return fmt.Errorf("invalid target: %s (must be 'clipboard', 'stdout', or 'file:/path')", config.Target)
 	}
-	
+
 	// Validate prompts location exists or can be created
 	if config.PromptsLocation != "" {
 		expandedPath := expandPath(config.PromptsLocation)
@@ -194,7 +188,7 @@ func (m *Manager) Validate(config *interfaces.Config) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -218,7 +212,7 @@ func (m *Manager) MergeConfig(other *interfaces.Config) {
 	if other == nil {
 		return
 	}
-	
+
 	if other.PromptsLocation != "" {
 		m.v.Set("prompts_location", other.PromptsLocation)
 	}
@@ -241,7 +235,7 @@ func (m *Manager) MergeConfig(other *interfaces.Config) {
 	if other.Target != "" {
 		m.v.Set("target", other.Target)
 	}
-	
+
 	// Note: InteractiveDefault is a boolean, so we always set it
 	m.v.Set("interactive_default", other.InteractiveDefault)
 }
@@ -251,11 +245,12 @@ func expandPath(path string) string {
 	if !strings.HasPrefix(path, "~/") {
 		return path
 	}
-	
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return path // Return original path if we can't get home dir
 	}
-	
+
 	return filepath.Join(homeDir, path[2:])
 }
+
