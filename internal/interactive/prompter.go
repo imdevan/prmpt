@@ -35,26 +35,8 @@ func (p *Prompter) CollectMissingInputs(request *models.PromptRequest) error {
 		}
 	}
 
-	// Collect pre template if not specified
-	if request.PreTemplate == "" {
-		if err := p.promptForPreTemplate(request); err != nil {
-			return fmt.Errorf("failed to collect pre template: %w", err)
-		}
-	}
-
-	// Collect post template if not specified
-	if request.PostTemplate == "" {
-		if err := p.promptForPostTemplate(request); err != nil {
-			return fmt.Errorf("failed to collect post template: %w", err)
-		}
-	}
-
-	// Collect directory inclusion if not specified
-	if request.Directory == "" && len(request.Files) == 0 {
-		if err := p.promptForDirectoryInclusion(request); err != nil {
-			return fmt.Errorf("failed to collect directory inclusion: %w", err)
-		}
-	}
+	// Skip template and directory prompts - use defaults (empty) if not specified
+	// This removes the interactive prompts for templates and directory inclusion
 
 	// Show confirmation summary
 	if err := p.showConfirmationSummary(request); err != nil {
@@ -163,52 +145,7 @@ func (p *Prompter) promptForDirectoryInclusion(request *models.PromptRequest) er
 
 // showConfirmationSummary displays a summary and asks for confirmation
 func (p *Prompter) showConfirmationSummary(request *models.PromptRequest) error {
-	fmt.Println("\n=== Prompt Generation Summary ===")
-	
-	if request.FixMode {
-		fmt.Println("Mode: Fix mode (processing captured command output)")
-	} else {
-		fmt.Printf("Base prompt: %s\n", truncateString(request.BasePrompt, 60))
-	}
-	
-	if request.PreTemplate != "" {
-		fmt.Printf("Pre-template: %s\n", request.PreTemplate)
-	}
-	
-	if request.PostTemplate != "" {
-		fmt.Printf("Post-template: %s\n", request.PostTemplate)
-	}
-	
-	if len(request.Files) > 0 {
-		fmt.Printf("Files: %s\n", strings.Join(request.Files, ", "))
-	}
-	
-	if request.Directory != "" {
-		fmt.Printf("Directory: %s\n", request.Directory)
-	}
-	
-	if request.Target != "" {
-		fmt.Printf("Output target: %s\n", request.Target)
-	}
-	
-	if request.Editor != "" {
-		fmt.Printf("Editor: %s\n", request.Editor)
-	}
-
-	prompt := &survey.Confirm{
-		Message: "Generate prompt with these settings?",
-		Default: true,
-	}
-
-	var confirmed bool
-	if err := survey.AskOne(prompt, &confirmed); err != nil {
-		return err
-	}
-
-	if !confirmed {
-		return fmt.Errorf("operation cancelled by user")
-	}
-
+	// Skip confirmation prompt entirely
 	return nil
 }
 
