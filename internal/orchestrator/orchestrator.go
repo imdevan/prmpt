@@ -547,7 +547,7 @@ func (o *Orchestrator) getLastCommandFromHistory(historyFile, shell string) (str
 		}
 
 		// Skip prompter commands to avoid recursion
-		if strings.Contains(line, "prompter") && strings.Contains(line, "--fix") {
+		if strings.Contains(line, "prompter") {
 			continue
 		}
 
