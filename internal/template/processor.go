@@ -13,15 +13,17 @@ import (
 
 // Processor implements the TemplateProcessor interface
 type Processor struct {
-	promptsLocation string
-	localPromptsLocation string // Additional location for local prompts
+	promptsLocation      string
+	localPromptsLocation string                                // Additional location for local prompts
+	customTemplates      map[string]interfaces.CustomTemplate // Custom template configurations
 }
 
 // NewProcessor creates a new template processor
 func NewProcessor(promptsLocation string) *Processor {
 	return &Processor{
-		promptsLocation: promptsLocation,
+		promptsLocation:      promptsLocation,
 		localPromptsLocation: "", // Will be set by SetLocalPromptsLocation
+		customTemplates:      make(map[string]interfaces.CustomTemplate),
 	}
 }
 
@@ -53,14 +55,30 @@ func (p *Processor) SetLocalPromptsFromConfig(configLocation string) {
 	}
 }
 
-// GetPromptLocations returns all prompt locations (local first, then configured)
+// SetCustomTemplates sets the custom template configurations
+func (p *Processor) SetCustomTemplates(customTemplates map[string]interfaces.CustomTemplate) {
+	p.customTemplates = customTemplates
+}
+
+// GetPromptLocations returns all prompt locations (local first, then configured, then custom)
 func (p *Processor) GetPromptLocations() []string {
 	var locations []string
 	if p.localPromptsLocation != "" {
 		locations = append(locations, p.localPromptsLocation)
 	}
 	locations = append(locations, p.promptsLocation)
+	
+	// Add custom template locations
+	for _, customTemplate := range p.customTemplates {
+		locations = append(locations, customTemplate.Location)
+	}
+	
 	return locations
+}
+
+// GetCustomTemplates returns the custom template configurations
+func (p *Processor) GetCustomTemplates() map[string]interfaces.CustomTemplate {
+	return p.customTemplates
 }
 
 // LoadTemplate loads a template from the specified path or discovers it by name
@@ -82,7 +100,7 @@ func (p *Processor) LoadTemplate(nameOrPath string) (*template.Template, error) 
 // discoverTemplate finds a template file by name (case-insensitive matching by stem)
 func (p *Processor) discoverTemplate(name string) (string, error) {
 	// Build list of directories to check
-	// Priority: local prompts first, then configured prompts location
+	// Priority: local prompts first, then configured prompts location, then custom templates
 	var directories []string
 	
 	// Add local prompts directories if available
@@ -98,6 +116,14 @@ func (p *Processor) discoverTemplate(name string) (string, error) {
 		filepath.Join(p.promptsLocation, "pre"),
 		filepath.Join(p.promptsLocation, "post"),
 	)
+	
+	// Add custom template directories
+	for _, customTemplate := range p.customTemplates {
+		directories = append(directories,
+			filepath.Join(customTemplate.Location, "pre"),
+			filepath.Join(customTemplate.Location, "post"),
+		)
+	}
 
 	for _, dir := range directories {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {

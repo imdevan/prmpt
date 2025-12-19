@@ -93,6 +93,7 @@ func (o *Orchestrator) loadConfiguration(configPath string) (*interfaces.Config,
 	if processor, ok := o.templateProcessor.(*template.Processor); ok {
 		processor.SetPromptsLocation(cfg.PromptsLocation)
 		processor.SetLocalPromptsFromConfig(cfg.LocalPromptsLocation)
+		processor.SetCustomTemplates(cfg.CustomTemplates)
 	}
 
 	return cfg, nil
@@ -203,6 +204,7 @@ func (o *Orchestrator) processTemplate(templateName string, request *models.Prom
 	if processor, ok := o.templateProcessor.(*template.Processor); ok {
 		processor.SetPromptsLocation(cfg.PromptsLocation)
 		processor.SetLocalPromptsFromConfig(cfg.LocalPromptsLocation)
+		processor.SetCustomTemplates(cfg.CustomTemplates)
 	}
 
 	// Load template using the template processor's discovery mechanism

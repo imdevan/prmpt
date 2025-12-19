@@ -11,6 +11,7 @@ import (
 	"prompter-cli/internal/interactive"
 	"prompter-cli/internal/interfaces"
 	"prompter-cli/internal/orchestrator"
+	"prompter-cli/internal/template"
 	"prompter-cli/pkg/models"
 )
 
@@ -96,13 +97,34 @@ func ListTemplates(request *models.PromptRequest) error {
 	// Create template processor to get all prompt locations
 	templateProcessor := orch.GetTemplateProcessor()
 	locations := templateProcessor.GetPromptLocations()
+	customTemplates := templateProcessor.GetCustomTemplates()
 
 	// Display all prompt locations
 	fmt.Printf("Prompt locations:\n")
+	localDisplayed := false
 	for i, location := range locations {
 		displayPath := contractPath(location)
-		if i == 0 && len(locations) > 1 {
+		
+		// Check if this is a local location
+		if !localDisplayed && i == 0 && len(locations) > 1 && location != cfg.PromptsLocation {
 			fmt.Printf("  - %s (local)\n", displayPath)
+			localDisplayed = true
+			continue
+		}
+		
+		// Check if this is a custom template location
+		isCustom := false
+		customName := ""
+		for name, customTemplate := range customTemplates {
+			if customTemplate.Location == location {
+				isCustom = true
+				customName = name
+				break
+			}
+		}
+		
+		if isCustom {
+			fmt.Printf("  - %s (custom: %s)\n", displayPath, customName)
 		} else {
 			fmt.Printf("  - %s\n", displayPath)
 		}
@@ -137,17 +159,34 @@ func ListTemplates(request *models.PromptRequest) error {
 		}
 	}
 
+	// Helper function to get template label
+	getTemplateLabel := func(location string) string {
+		// Check if it's local
+		if len(locations) > 1 && location != cfg.PromptsLocation {
+			// Check if it's a custom template
+			for name, customTemplate := range customTemplates {
+				if customTemplate.Location == location {
+					return fmt.Sprintf(" (custom: %s)", name)
+				}
+			}
+			// Check if it's the local prompts location
+			if processor, ok := templateProcessor.(*template.Processor); ok {
+				if location == processor.GetPromptLocations()[0] && location != cfg.PromptsLocation {
+					return " (local)"
+				}
+			}
+		}
+		return ""
+	}
+
 	// Display pre-templates
 	if len(allPreTemplates) == 0 {
 		fmt.Printf("Pre-templates: (none found)\n")
 	} else {
 		fmt.Printf("Pre-templates:\n")
 		for tmpl, location := range allPreTemplates {
-			if len(locations) > 1 && location != cfg.PromptsLocation {
-				fmt.Printf("  - %s (local)\n", tmpl)
-			} else {
-				fmt.Printf("  - %s\n", tmpl)
-			}
+			label := getTemplateLabel(location)
+			fmt.Printf("  - %s%s\n", tmpl, label)
 		}
 	}
 
@@ -159,11 +198,8 @@ func ListTemplates(request *models.PromptRequest) error {
 	} else {
 		fmt.Printf("Post-templates:\n")
 		for tmpl, location := range allPostTemplates {
-			if len(locations) > 1 && location != cfg.PromptsLocation {
-				fmt.Printf("  - %s (local)\n", tmpl)
-			} else {
-				fmt.Printf("  - %s\n", tmpl)
-			}
+			label := getTemplateLabel(location)
+			fmt.Printf("  - %s%s\n", tmpl, label)
 		}
 	}
 

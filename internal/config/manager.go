@@ -202,6 +202,42 @@ func (m *Manager) Validate(config *interfaces.Config) error {
 // getConfigFromViper converts viper configuration to Config struct
 // This handles env > config > defaults precedence (flags are applied separately)
 func (m *Manager) getConfigFromViper() *interfaces.Config {
+	// Parse custom templates
+	customTemplates := make(map[string]interfaces.CustomTemplate)
+	if m.v.IsSet("custom_template") {
+		customTemplateMap := m.v.GetStringMap("custom_template")
+		for name := range customTemplateMap {
+			location := m.v.GetString(fmt.Sprintf("custom_template.%s.location", name))
+			interactive := m.v.GetBool(fmt.Sprintf("custom_template.%s.interactive", name))
+			flag := m.v.GetString(fmt.Sprintf("custom_template.%s.flag", name))
+			shorthand := m.v.GetString(fmt.Sprintf("custom_template.%s.shorthand", name))
+			templateType := m.v.GetString(fmt.Sprintf("custom_template.%s.type", name))
+			
+			// If location is not set, default to prompts_location/name
+			if location == "" {
+				location = filepath.Join(m.v.GetString("prompts_location"), name)
+			}
+			
+			// If flag is not set, default to the template name
+			if flag == "" {
+				flag = name
+			}
+			
+			// If type is not set, default to "pre"
+			if templateType == "" {
+				templateType = "pre"
+			}
+			
+			customTemplates[name] = interfaces.CustomTemplate{
+				Location:    expandPath(location),
+				Interactive: interactive,
+				Flag:        flag,
+				Shorthand:   shorthand,
+				Type:        templateType,
+			}
+		}
+	}
+	
 	return &interfaces.Config{
 		PromptsLocation:      expandPath(m.v.GetString("prompts_location")),
 		LocalPromptsLocation: expandPath(m.v.GetString("local_prompts_location")),
@@ -212,6 +248,7 @@ func (m *Manager) getConfigFromViper() *interfaces.Config {
 		DirectoryStrategy:    m.v.GetString("directory_strategy"),
 		Target:               m.v.GetString("target"),
 		InteractiveDefault:   m.v.GetBool("interactive_default"),
+		CustomTemplates:      customTemplates,
 	}
 }
 

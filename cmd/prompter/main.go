@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"prompter-cli/internal/app"
+	"prompter-cli/internal/config"
 	"prompter-cli/pkg/models"
 )
 
@@ -170,6 +171,9 @@ func init() {
 	rootCmd.Flags().String("fix-file", "", "file containing command output to fix (overrides config)")
 	rootCmd.Flags().BoolP("numbers", "n", false, "enable number key selection for templates")
 	rootCmd.Flags().BoolP("clipboard", "b", false, "append clipboard content to prompt (or use as base prompt if none provided)")
+	
+	// Register custom template flags dynamically
+	registerCustomTemplateFlags()
 }
 
 // buildRequestFromFlags constructs a PromptRequest from command flags and arguments
@@ -260,9 +264,152 @@ func buildRequestFromFlags(cmd *cobra.Command, args []string) (*models.PromptReq
 		return nil, fmt.Errorf("invalid clipboard flag: %w", err)
 	}
 
-
+	// Handle custom template flags
+	if err := applyCustomTemplateFlags(cmd, request); err != nil {
+		return nil, fmt.Errorf("invalid custom template flag: %w", err)
+	}
 
 	return request, nil
+}
+
+// getFirstTemplateFromDir returns the first template name found in a directory
+func getFirstTemplateFromDir(dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		
+		name := entry.Name()
+		// Only include .md files
+		if strings.HasSuffix(name, ".md") {
+			// Remove .md extension and .default. prefix if present
+			templateName := name[:len(name)-3] // Remove .md
+			
+			// Remove .default. prefix if present
+			if len(templateName) > 9 && templateName[:9] == ".default." {
+				templateName = templateName[9:]
+			}
+			
+			return templateName, nil
+		}
+	}
+	
+	return "", fmt.Errorf("no .md templates found")
+}
+
+// applyCustomTemplateFlags checks for custom template flags and applies them to the request
+func applyCustomTemplateFlags(cmd *cobra.Command, request *models.PromptRequest) error {
+	// Load config to get custom templates
+	configManager := config.NewManager()
+	
+	configPath := request.ConfigPath
+	_, err := configManager.Load(configPath)
+	if err != nil {
+		// If config loading fails, no custom templates to apply
+		return nil
+	}
+	
+	resolvedCfg, err := configManager.Resolve()
+	if err != nil {
+		return nil
+	}
+	
+	// Check each custom template flag
+	for _, customTemplate := range resolvedCfg.CustomTemplates {
+		flagName := customTemplate.Flag
+		
+		// Check if this custom template flag is set
+		if flagSet, err := cmd.Flags().GetBool(flagName); err == nil && flagSet {
+			// Find the first available template in the custom location
+			templateDir := customTemplate.Location
+			if customTemplate.Type == "post" {
+				templateDir = fmt.Sprintf("%s/post", customTemplate.Location)
+			} else {
+				templateDir = fmt.Sprintf("%s/pre", customTemplate.Location)
+			}
+			
+			// Get the first template from the directory
+			templateName, err := getFirstTemplateFromDir(templateDir)
+			if err != nil {
+				return fmt.Errorf("no templates found in custom template location %s: %w", templateDir, err)
+			}
+			
+			// Apply the template based on its type
+			if customTemplate.Type == "post" {
+				// Only set if not already set by another custom template
+				if request.PostTemplate == "" {
+					request.PostTemplate = templateName
+				}
+			} else {
+				// Only set if not already set by another custom template
+				if request.PreTemplate == "" {
+					request.PreTemplate = templateName
+				}
+			}
+			
+			// If the custom template has interactive=false, set non-interactive mode
+			if !customTemplate.Interactive {
+				request.ForceNonInteractive = true
+			}
+		}
+	}
+	
+	return nil
+}
+
+// registerCustomTemplateFlags loads config and registers custom template flags
+func registerCustomTemplateFlags() {
+	// Try to load config to discover custom templates
+	configManager := config.NewManager()
+	
+	// Get config path from environment or use default
+	configPath := ""
+	if len(os.Args) > 1 {
+		// Look for -c or --config flag in args
+		for i, arg := range os.Args {
+			if (arg == "-c" || arg == "--config") && i+1 < len(os.Args) {
+				configPath = os.Args[i+1]
+				break
+			}
+			if strings.HasPrefix(arg, "--config=") {
+				configPath = strings.TrimPrefix(arg, "--config=")
+				break
+			}
+		}
+	}
+	
+	// Load configuration
+	_, err := configManager.Load(configPath)
+	if err != nil {
+		// If config loading fails, continue without custom templates
+		return
+	}
+	
+	resolvedCfg, err := configManager.Resolve()
+	if err != nil {
+		return
+	}
+	
+	// Register flags for each custom template
+	for name, customTemplate := range resolvedCfg.CustomTemplates {
+		flagName := customTemplate.Flag
+		shorthand := customTemplate.Shorthand
+		description := fmt.Sprintf("use custom template '%s' from %s", name, customTemplate.Location)
+		
+		// Add the flag (avoid conflicts with existing flags)
+		if rootCmd.Flags().Lookup(flagName) == nil {
+			if shorthand != "" && rootCmd.Flags().ShorthandLookup(shorthand) == nil {
+				rootCmd.Flags().BoolP(flagName, shorthand, false, description)
+			} else {
+				rootCmd.Flags().Bool(flagName, false, description)
+			}
+		}
+	}
 }
 
 func main() {

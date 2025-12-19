@@ -54,4 +54,7 @@ type TemplateProcessor interface {
 	
 	// GetPromptLocations returns all prompt locations being searched
 	GetPromptLocations() []string
+	
+	// GetCustomTemplates returns the custom template configurations
+	GetCustomTemplates() map[string]CustomTemplate
 }

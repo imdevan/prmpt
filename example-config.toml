@@ -4,6 +4,19 @@
 # Location where prompt templates are stored
 prompts_location = "~/.config/prompter/prompts"
 
+# Local prompts location (relative to current working directory)
+# If empty, will look for "prompts" directory in current working directory
+# local_prompts_location = "my-prompts"
+
+# Custom template definitions
+# Each custom template can have its own location, flag, and settings
+# [custom_template.my_custom]
+# location = "/path/to/custom/templates"  # Defaults to prompts_location/my_custom
+# interactive = true                      # Determines if template should be added to default interactive mode
+# flag = "my-custom"                      # CLI flag name, defaults to template name
+# shorthand = "m"                         # Single character shorthand for the flag
+# type = "pre"                            # "pre" or "post", defaults to "pre"
+
 # Default editor for opening prompts
 editor = "nvim"
 
