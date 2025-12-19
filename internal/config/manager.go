@@ -212,6 +212,7 @@ func (m *Manager) getConfigFromViper() *interfaces.Config {
 			flag := m.v.GetString(fmt.Sprintf("custom_template.%s.flag", name))
 			shorthand := m.v.GetString(fmt.Sprintf("custom_template.%s.shorthand", name))
 			templateType := m.v.GetString(fmt.Sprintf("custom_template.%s.type", name))
+			description := m.v.GetString(fmt.Sprintf("custom_template.%s.description", name))
 			
 			// If location is not set, default to prompts_location/name
 			if location == "" {
@@ -234,6 +235,7 @@ func (m *Manager) getConfigFromViper() *interfaces.Config {
 				Flag:        flag,
 				Shorthand:   shorthand,
 				Type:        templateType,
+				Description: description,
 			}
 		}
 	}

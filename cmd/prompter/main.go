@@ -399,7 +399,14 @@ func registerCustomTemplateFlags() {
 	for name, customTemplate := range resolvedCfg.CustomTemplates {
 		flagName := customTemplate.Flag
 		shorthand := customTemplate.Shorthand
-		description := fmt.Sprintf("use custom template '%s' from %s", name, customTemplate.Location)
+		
+		// Use custom description if provided, otherwise use default
+		var description string
+		if customTemplate.Description != "" {
+			description = customTemplate.Description
+		} else {
+			description = fmt.Sprintf("use custom template '%s' from %s", name, customTemplate.Location)
+		}
 		
 		// Add the flag (avoid conflicts with existing flags)
 		if rootCmd.Flags().Lookup(flagName) == nil {

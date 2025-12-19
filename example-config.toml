@@ -16,6 +16,7 @@ prompts_location = "~/.config/prompter/prompts"
 # flag = "my-custom"                      # CLI flag name, defaults to template name
 # shorthand = "m"                         # Single character shorthand for the flag
 # type = "pre"                            # "pre" or "post", defaults to "pre"
+# description = "Custom help description" # Custom help text, defaults to "use custom template 'name' from location"
 
 # Default editor for opening prompts
 editor = "nvim"

@@ -6,7 +6,8 @@ type CustomTemplate struct {
 	Interactive bool   `toml:"interactive"`
 	Flag        string `toml:"flag"`
 	Shorthand   string `toml:"shorthand"`
-	Type        string `toml:"type"` // "pre" or "post", defaults to "pre"
+	Type        string `toml:"type"`        // "pre" or "post", defaults to "pre"
+	Description string `toml:"description"` // Custom help description
 }
 
 // Config represents the application configuration
