@@ -2,6 +2,26 @@
 
 A Go-based command-line tool that assembles high-quality prompts for AI coding agents by combining base prompts with optional pre/post templates and contextual information from files, directories, and captured command output.
 
+Currently only tested on my personal mac. Please create an issue if you have any issues. 
+
+
+## Install
+
+
+### Homebrew
+
+Once the Homebrew tap is set up, you can install prompter using:
+
+```bash
+brew install imdevan/prompter/prompter
+```
+
+### Other
+
+See [Install Docs](./INSTALL.md) for manual instructions. 
+
+Please [create an issue]() if you would like to see another package manager added!
+
 ## Usage
 
 ### Default
@@ -11,6 +31,17 @@ prompter
 ```
 
 By default just running prompter will initialize interactive prompt generation.
+
+```
+? Enter your base prompt: [? for help]
+? Select a pre-template (prepended to prompt):  [Use arrows to move, type to filter, ? for more help]
+> None
+  question
+? Select a post-template (appended to prompt):  [Use arrows to move, type to filter, ? for more help]
+> None
+  prompter (local)  # local and global config are respected
+  strict
+```
 
 
 ### Fix mode

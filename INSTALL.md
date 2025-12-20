@@ -5,15 +5,14 @@
 Once the Homebrew tap is set up, you can install prompter using:
 
 ```bash
-brew tap YOUR_USERNAME/prompter
-brew install prompter
+brew install imdevan/prompter/prompter
 ```
 
 ## Manual Installation
 
 ### Download Pre-built Binaries
 
-1. Go to the [Releases page](https://github.com/YOUR_USERNAME/prompter-cli/releases)
+1. Go to the [Releases page](https://github.com/imdevan/prompter-cli/releases)
 2. Download the appropriate binary for your platform:
    - macOS (Intel): `prompter-darwin-amd64`
    - macOS (Apple Silicon): `prompter-darwin-arm64`
@@ -36,7 +35,7 @@ Requirements:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/prompter-cli.git
+git clone https://github.com/imdevan/prompter-cli.git
 cd prompter-cli
 
 # Build and install
@@ -83,7 +82,7 @@ target = "clipboard"
 ### Homebrew
 ```bash
 brew uninstall prompter
-brew untap YOUR_USERNAME/prompter
+brew untap imdevan/prompter
 ```
 
 ### Manual
