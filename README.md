@@ -1,4 +1,4 @@
-# Prompter CLI
+# [Prompter CLI](https://devan.gg/prompter-cli)
 
 A Go-based command-line tool that assembles high-quality prompts for AI coding agents by combining base prompts with optional pre/post templates and contextual information from files, directories, and captured command output.
 
